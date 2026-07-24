@@ -1,0 +1,36 @@
+flowchart TD
+    subgraph Current["Current-State Workflow (Manual)"]
+        C1["Customer calls/chats\n⏱ 3 min"]
+        C2["CSKH listens & takes notes\n⏱ 3 min"]
+        C3["CSKH searches FAQ,\ntechnical manuals\n⏱ 7 min 🔴"]
+        C4["CSKH composes\nresponse manually\n⏱ 5 min 🔴"]
+        C5["CSKH reads back\nto customer\n⏱ 2 min"]
+
+        C1 -->|Handoff| C2
+        C2 --> C3
+        C3 --> C4
+        C4 --> C5
+    end
+
+    subgraph Future["Future-State Workflow (AI Copilot)"]
+        F1["Customer calls/chats\n⏱ 3 min"]
+        F2["🔵 AI classifies intent\n& retrieves KB\n⏱ 1 min"]
+        F3["🔵 Gemini 2.5 Flash\nRAG → Draft response\n[DRAFT_ONLY] ⏱ 1 min"]
+        F4["🟢 CSKH reviews,\nedits & approves\n⏱ 2 min"]
+        F5["CSKH sends to\ncustomer\n⏱ 1 min"]
+
+        F1 -->|Handoff| F2
+        F2 --> F3
+
+        F3 -->|"confidence ≥ 85%"| F4
+        F3 -->|"confidence < 85%\nor KB insufficient"| F6["↩️ Fallback:\nEscalate to senior CSKH"]
+        F4 --> F5
+    end
+
+    subgraph Legend["Legend"]
+        L1["🔴 Bottleneck"]
+        L2["🔄 Handoff"]
+        L3["🔵 AI Step"]
+        L4["🟢 Human Step (HITL)"]
+        L5["↩️ Fallback"]
+    end
