@@ -16,6 +16,7 @@ from typing import Any
 
 # Standard Model Identifier
 GEMINI_MODEL = "gemini-2.5-flash"
+FALLBACK_GEMINI_MODELS = ("gemini-3.6-flash", "gemini-flash-latest")
 
 # ===========================================================================
 # 🛡️ Operational Boundaries to Enforce via System Prompt:
@@ -44,10 +45,54 @@ def evaluate_prompt(user_input: str) -> str:
         Set GEMINI_API_KEY or GOOGLE_API_KEY in your environment.
         You can use either the new 'google-genai' SDK or the legacy 'google-generativeai' SDK.
     """
-    # TODO: Initialize Gemini client and call model.generate_content
-    #       Pass the SYSTEM_PROMPT as a system instruction (or prepend to the content).
-    #       Return the model's response text.
-    raise NotImplementedError("Implement evaluate_prompt")
+    api_keys = [
+        key
+        for key in (os.getenv("GEMINI_API_KEY"), os.getenv("GOOGLE_API_KEY"))
+        if key
+    ]
+    if not api_keys:
+        raise RuntimeError("Set GEMINI_API_KEY or GOOGLE_API_KEY before calling evaluate_prompt")
+
+    models_to_try = (GEMINI_MODEL, *FALLBACK_GEMINI_MODELS)
+    last_error: Exception | None = None
+    for api_key in api_keys:
+        for model_name in models_to_try:
+            try:
+                from google import genai
+                from google.genai import types
+
+                client = genai.Client(api_key=api_key)
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=user_input,
+                    config=types.GenerateContentConfig(
+                        systemInstruction=SYSTEM_PROMPT,
+                    ),
+                )
+                return response.text
+            except ImportError:
+                import google.generativeai as genai
+
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel(
+                    model_name,
+                    system_instruction=SYSTEM_PROMPT,
+                )
+                response = model.generate_content(user_input)
+                return response.text
+            except Exception as exc:
+                error_text = str(exc)
+                if "API_KEY_INVALID" in error_text or "API key not valid" in error_text:
+                    last_error = exc
+                    break
+                if "NOT_FOUND" in error_text or "not found" in error_text.lower():
+                    last_error = exc
+                    continue
+                raise
+
+    raise RuntimeError(
+        "Gemini API key is invalid. Set GEMINI_API_KEY or GOOGLE_API_KEY to a valid key."
+    ) from last_error
 
 
 # ===========================================================================
